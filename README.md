@@ -1,70 +1,113 @@
-# ATC Clarity Console — Synthetic Demo
+# ATC Clarity Console — Research Prototype
 
-> ** Safety disclaimer:**
-> This is a **research prototype** and uses **fully synthetic data**.
-> It is **not** connected to any live ATC systems and is **not for operational use**.
+A small, self-contained demo of an ATC “clarity console” — a side UI that helps humans
+see sector risk, conflicts, workload, and comms load at a glance.
 
-Most “AI for ATC” concepts jump straight to full autonomy.
-This project explores something simpler and more conservative:
-
-> A **clarity console** that helps humans see sector risk, conflicts, workload, and comms
-load at a glance, while keeping humans firmly in the loop.
-
-The app is built in **Python + Streamlit** and runs a small synthetic airspace sector to
-exercise the UI and logic.
+Built in **Python + Streamlit**, using **fully synthetic** telemetry.
+No live data. Not connected to any operational system. Not for real-world use.
 
 ---
 
-## What it does
+## What this demo does
 
-The ATC Clarity Console demo:
+The app spins up a toy ATC sector and continuously moves a small fleet of aircraft around a
+map while computing a handful of heuristics.
 
-- Generates a **mock sector** with ~20 synthetic aircraft:
-- ID, altitude, speed, lat/lon, destination.
-- Runs a **basic conflict detector**:
-- Vertical separation threshold.
-- Small lat/lon box for lateral proximity.
+### Synthetic traffic + motion
 
-- Keeps a **rolling history of conflicts** and:
-- Estimates short-term **predicted conflicts** based on recent trend.
-- Computes a **workload index** that combines:
-- Traffic count.
-- Current conflict count.
-- Estimates a **comms load** as a simple random fraction (how “busy” the frequency feels
-in this toy model).
-- Rolls everything into a single **clarity score** (0–100) that drops as:
-- Current conflicts increase.
-- Predicted conflicts increase.
-- Workload rises.
-- Comms fraction rises.
-- Adds a small **Bayesian confidence layer** with four high-level conditions:
+- Generates ~20 mock aircraft with:
+- `id`, altitude, speed, heading
+- lat / lon in a small box around Indianapolis
+- destination airport (IND / ORD / SDF / CVG)
+- Every tick:
+- Aircraft advance along their heading using a simple kinematics step
+- Headings drift slightly so the pattern doesn’t look perfectly scripted
+
+### Conflict detection
+
+Deliberately simple, just to drive the UI:
+
+- Vertical threshold: **< 800 ft**
+- Lateral box: **~0.02° lat / 0.02° lon**
+- Any pair inside those bounds is flagged as a conflict
+
+### Workload + clarity score
+
+From the current sector state, the console computes:
+
+- **Traffic load** – number of active aircraft
+- **Workload index** – mixes traffic volume + conflict count
+`idx = min(1.0, (count/40) + conflicts * 0.15)`
+- **Comms fraction** – random fraction between 0.05–0.25 to stand in for “how busy the
+frequency feels”
+- **Clarity score (0–100)** – starts at 100 and gets penalized by:
+- current conflicts
+- predicted conflicts (short trend over recent history)
+- workload index
+- comms fraction
+
+> The clarity score is a **vibe / spice metric**, not a safety metric.
+
+### Bayesian condition layer
+
+On top of the raw numbers, a tiny Bayesian layer classifies the sector into four high-level
+conditions:
+
 - `STABLE`
 - `ELEVATED`
 - `HIGH_LOAD`
 - `CRITICAL`
-- Provides a **human-gated action panel**:
-- System can suggest actions like *“Hold all departures”* or *“Request altitude
-separation”*.
-- An operator must explicitly confirm the choice.
-- Every confirmed action is **logged with a timestamp**.
 
-Again: this is a **thinking tool / UI exploration**, not a certified safety system.
+Priors + evidence are hand-tuned; the goal is to show how you might map noisy telemetry
+into a small, interpretable state machine — not to claim statistical rigor.
+
+### UI surfaces
+
+The Streamlit UI shows:
+
+- **Top metrics**
+- Clarity %
+- Active conflict count
+- Predicted conflicts (5 min)
+- Traffic load, workload index, comms fraction
+- **Bayesian confidence bar chart**
+- Probability mass over STABLE / ELEVATED / HIGH_LOAD / CRITICAL
+- Call-out for the most likely condition
+- **Sector map**
+- Plotly scatter of aircraft positions (moving dots)
+- Conflict aircraft highlighted
+- **Active aircraft telemetry table**
+- One row per aircraft
+
+- **Conflict table**
+- List of current conflict pairs (if any)
+- **Human-gated action panel**
+- Operator can choose:
+- “Hold all departures”
+- “Issue spacing instructions”
+- “Request altitude separation”
+- “Do nothing (monitor only)”
+- Choice is confirmed in-UI with a timestamp
+
+The system **never acts on its own**. It only suggests; a human has to choose and
+confirm.
 
 ---
 
-## Tech stack
+## Controls
 
-- [Python](https://www.python.org/)
-- [Streamlit](https://streamlit.io/) for the UI
-- [pandas](https://pandas.pydata.org/) for table views
-- [NumPy](https://numpy.org/) for basic numeric handling
+Left sidebar:
+
+- **Auto-run** – when checked, the sim advances automatically
+- **Update interval (sec)** – how often to step the sim when auto-run is on
+- **Step once** – advance a single tick when auto-run is off
 
 ---
 
-## Running it locally
+## Running the demo locally
 
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/<your-username>/atc-clarity-console.git
-cd atc-clarity-console
+git clone https://github.com/<your-org>/ASL-ATC-Clarity2.git
+cd ASL-ATC-Clarity2
